@@ -22,6 +22,3 @@ if __name__ == '__main__':
     # print(pc.connectionState)
     # print(pc.iceConnectionState)
 
-'''
-C:/Users/redma/OneDrive/Desktop/VSCode_Projects/SERVER-CLIENT-HACKATHON/client.py
-'''
