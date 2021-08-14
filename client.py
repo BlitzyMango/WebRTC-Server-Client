@@ -20,7 +20,3 @@ if __name__ == '__main__':
     pc = RTCPeerConnection()
 
     # pc.createAnswer
-
-'''
-C:/Users/redma/OneDrive/Desktop/VSCode_Projects/SERVER-CLIENT-HACKATHON/client.py
-'''
