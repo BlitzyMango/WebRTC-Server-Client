@@ -1,98 +1,66 @@
-# Client-side WebRTC program using TCP Signaling
-# Written by Eddie Elvira
-
 import numpy as np
 import cv2
 import multiprocessing
 import asyncio
 import json
+import socket
 
 
-from aiortc import RTCPeerConnection, RTCIceCandidate, RTCSessionDescription
-from aiortc.contrib.signaling import TcpSocketSignaling, add_signaling_arguments, create_signaling, BYE
+from aiortc import RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, MediaStreamTrack
+from aiortc.contrib.signaling import TcpSocketSignaling, BYE
 
-async def client_ball(msg):
-    global runball
-    '''
-    Display client-side ball using data received from server
-    '''
-    # extract contents from message
-    width = msg["window_width"]
-    length =  msg["window_length"]
-    color = msg["ball_color"],
-    radius = int(msg["ball_radius"])
-    img = np.zeros((width, length, 3), dtype = 'uint8')
+class BallTransformTrack(MediaStreamTrack):
+    """
+    A video transform track that transforms frames of a 2D ball from another track
+    """
 
-    # increment circle position based on server data
-    position = msg["position"]
-    x, y = position[0], position[1]
+    kind = "video"
 
-    runball = bool(msg['runball'])
+    def __init__(self, track):
+        super().__init__()
+        self.track = track
 
-    # draw ball
-    img = cv2.circle(img, (x,y), 10, (255, 255, 255), -1)
+    async def recv(self):
+        frame = await self.track.recv()
+        
+async def answer(pc, signaling):
+    """
+    Connect to server and receive tracks by sending an answer after awaiting an offer
+    """
 
-    # show image
-    cv2.imshow('client', img)
-    k = cv2.waitKey(10)
+    @pc.on("track")
+    def on_track(track):
+        print("Receiving %s" % track.kind)
+        if track.kind == "video":
+            pc.addTrack(BallTransformTrack(track))
 
-    if k != -1:
-        runball = False
-
-async def handle_offer(pc, tcp):
-    '''
-    Receive offer from server and create/send answer
-    '''
+    await signaling.connect()
     while True:
-        offer = await tcp.receive() #receive offer from server
-
-        if isinstance(offer, RTCSessionDescription):
-            await pc.setRemoteDescription(offer)
-            if offer.type == "offer":
+        obj = await signaling.receive()
+        if isinstance(obj, RTCSessionDescription):
+            await pc.setRemoteDescription(obj)
+            if obj.type == "offer":
+                # send answer
                 await pc.setLocalDescription(await pc.createAnswer())
-                await tcp.send(pc.localDescription)
-        elif isinstance(offer, RTCIceCandidate):
-            await pc.addIceCandidate(offer)
-        elif offer is BYE:
+                await signaling.send(pc.localDescription)
+        elif isinstance(obj, RTCIceCandidate):
+            await pc.addIceCandidate(obj)
+        elif obj is BYE:
             print("Exiting Program")
             break
+        
+if __name__ == "__main__":
+    ip = socket.gethostbyname(socket.gethostname())
+    port = 8888
 
-async def answer(rc, tcp):
-    '''
-    Connect to the server and prepare to handle incoming offer
-    '''
-    await tcp._connect(False)   #await connection to server
+    signaling = TcpSocketSignaling(ip, port)                # Mark signaling process on socket that uses TCP
+    pc = RTCPeerConnection()                                # Create a new WebRTC Connection from peer to peer
 
-    @rc.on("datachannel")
-    def ondatachannel(channel):
-        print(f'Channel({channel.label}) - Created by remote party')
-        print("Connection opened!")
-        @channel.on("message")
-        def onmessage(message):
-            global runball
-            runball = True
-            if runball:
-                # decode json message from server
-                msg = json.loads(message)
-                asyncio.create_task(client_ball(msg))
-            else:
-                cv2.destroyAllWindows()
-
-    await handle_offer(rc, tcp)
-
-
-if __name__ == '__main__':
-    HOST = '127.0.0.1'
-    PORT = 1234
-
-    tcp = TcpSocketSignaling(HOST, PORT)
-    pc = RTCPeerConnection()
-    # run event loop
-    loop = asyncio.get_event_loop()
-    try: 
-        loop.run_until_complete(answer(pc, tcp))
-    except KeyboardInterrupt:
+    loop = asyncio.get_event_loop()                         # Event loop
+    try:
+        loop.run_until_complete(answer(pc, signaling))      # Begin signaling process by responding to server offer
+    except KeyboardInterrupt:                               # Exit program when ^C is entered on command-line
         pass
     finally:
-        loop.run_until_complete(pc.close())
-        loop.run_until_complete(tcp.close())
+        loop.run_until_complete(signaling.close())          # End signaling process
+        loop.run_until_complete(pc.close())                 # Close WebRTC Connection
