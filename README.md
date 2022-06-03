@@ -6,13 +6,12 @@ A repository containing a server program that is able to display and transmit li
 
 ## Requirements
 
-This project has several requirements. It can only be ran or edited by a Python IDE/interpreter that meets these conditions:
+This project has several installations and requirements that must be satisfied before proceeding. The programs inside this repository can only run on a Python IDE/interpreter that meets these conditions:
 
 - Is running on Linux (Debian/Ubuntu) or Mac OS X
 - Uses Python 3.9 or higher (recommended)
 - Has the following Python modules installed:
   - `aiortc`
-  - `multiprocessing`
   - `numpy`
   - `av`
   - `opencv`
@@ -20,7 +19,7 @@ This project has several requirements. It can only be ran or edited by a Python 
 The above modules can be installed using the following pip command:
 
 ```
-pip install aiortc, multiprocessing, numpy, av, opencv-python,
+pip install aiortc, numpy, av, opencv-python
 ```
 
 ## How to Run
