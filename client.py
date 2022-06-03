@@ -1,13 +1,12 @@
-import numpy as np
 import cv2
 import multiprocessing
 import asyncio
-import json
 import socket
 
 
 from aiortc import RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, MediaStreamTrack
 from aiortc.contrib.signaling import TcpSocketSignaling, BYE
+
 
 class BallTransformTrack(MediaStreamTrack):
     """
@@ -19,30 +18,42 @@ class BallTransformTrack(MediaStreamTrack):
     def __init__(self, track):
         super().__init__()
         self.track = track
+        self.count = 0
+        print(f"Track ID: {track.id}")
 
     async def recv(self):
+        """
+        Receive VideoFrames from server and display it on client-side window
+        """
         frame = await self.track.recv()
+        img = frame.to_ndarray(format="bgr24")
+        cv2.imshow("client", img)
+        cv2.waitKey(1)
+        self.count += 1
+        return frame
         
-async def answer(pc, signaling):
+async def run(pc, signaling):
     """
     Connect to server and receive tracks by sending an answer after awaiting an offer
     """
 
     @pc.on("track")
     def on_track(track):
+        print("Connection opened!")
         print("Receiving %s" % track.kind)
         if track.kind == "video":
             pc.addTrack(BallTransformTrack(track))
 
+    # connect signaling
     await signaling.connect()
+
     while True:
-        obj = await signaling.receive()
+        obj = await signaling.receive()                                 # receive offer
         if isinstance(obj, RTCSessionDescription):
             await pc.setRemoteDescription(obj)
             if obj.type == "offer":
-                # send answer
-                await pc.setLocalDescription(await pc.createAnswer())
-                await signaling.send(pc.localDescription)
+                await pc.setLocalDescription(await pc.createAnswer())   # create answer
+                await signaling.send(pc.localDescription)               # send to server
         elif isinstance(obj, RTCIceCandidate):
             await pc.addIceCandidate(obj)
         elif obj is BYE:
@@ -58,7 +69,7 @@ if __name__ == "__main__":
 
     loop = asyncio.get_event_loop()                         # Event loop
     try:
-        loop.run_until_complete(answer(pc, signaling))      # Begin signaling process by responding to server offer
+        loop.run_until_complete(run(pc, signaling))      # Begin signaling process by responding to server offer
     except KeyboardInterrupt:                               # Exit program when ^C is entered on command-line
         pass
     finally:
