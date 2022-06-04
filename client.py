@@ -2,6 +2,7 @@ import cv2
 import multiprocessing
 import asyncio
 import socket
+from av import VideoFrame
 
 
 from aiortc import RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, MediaStreamTrack
@@ -18,10 +19,9 @@ class BallTransformTrack(MediaStreamTrack):
     def __init__(self, track):
         super().__init__()
         self.track = track
-        self.count = 0
         print(f"Track ID: {track.id}")
 
-    async def recv(self):
+    async def recv(self) -> VideoFrame:
         """
         Receive VideoFrames from server and display it on client-side window
         """
@@ -29,10 +29,10 @@ class BallTransformTrack(MediaStreamTrack):
         img = frame.to_ndarray(format="bgr24")
         cv2.imshow("client", img)
         cv2.waitKey(1)
-        self.count += 1
         return frame
         
-async def run(pc, signaling):
+        
+async def run(pc, signaling) -> None:
     """
     Connect to server and receive tracks by sending an answer after awaiting an offer
     """

@@ -4,6 +4,9 @@ import multiprocessing
 import asyncio
 import socket
 from av import VideoFrame
+import random
+import colorsys
+from threading import Thread
 
 
 from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
@@ -17,29 +20,53 @@ class BallStreamTrack(VideoStreamTrack):
     
     def __init__(self):
         super().__init__()
-        self.counter = 0
-        self.frames = []
+        self.height, self.width = 320, 480
+        self.x, self.y = 100, 100
+        self.dx, self.dy = 2, 2
+        self.radius = 20
+        self.color = (0, 0, 0)
+        self.randomize_color()
 
-        for i in range(0, 200, 2):
-            img = np.ones((200, 200, 3), dtype=np.uint8) * i
-            self.frames.append(VideoFrame.from_ndarray(img, format="bgr24"))
-
-    async def recv(self):
+    async def recv(self) -> VideoFrame:
         """
         Send VideoFrame to client and display it on server-side window
         """
         pts, time_base = await self.next_timestamp()
 
-        frame = self.frames[self.counter % 100]
-        img = frame.to_ndarray(format="bgr24")
+        img = self.next_image()
+
+        frame = VideoFrame.from_ndarray(img, format="bgr24")
         cv2.imshow("server", img)
         cv2.waitKey(1)
         frame.pts = pts
         frame.time_base = time_base
-        self.counter += 1
         return frame
+    
+    def next_image(self) -> np.ndarray:
+        img = np.zeros((self.height, self.width, 3), dtype=np.uint8)
+        self.x += self.dx
+        self.y += self.dy
+        cv2.circle(img, (self.x, self.y), self.radius, self.color, -1)
 
-async def run(pc, signaling):
+        if self.y >= (self.height - self.radius) or self.y <= self.radius:
+            self.dy *= -1
+            Thread(target=self.randomize_color).start()
+
+        if self.x >= (self.width - self.radius) or self.x <= self.radius:
+            self.dx *= -1
+            Thread(target=self.randomize_color).start()
+
+        return img
+        
+    def randomize_color(self) -> None:
+        r, g, b = self.color
+        while (r, g, b) == self.color:
+            h, s, l = random.random(), 0.5 + random.random() / 2.0, 0.4 + random.random() / 5.0
+            r, g, b = [int(256 * i) for i in colorsys.hls_to_rgb(h, l, s)]   
+        self.color = (r, g, b)
+
+
+async def run(pc, signaling) -> None:
     """
     Connect to client and send data by sending an offer and establishing a connection after an answer 
     """
