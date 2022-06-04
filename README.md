@@ -42,7 +42,13 @@ This process can currently only occur within a localhost, but remote functionali
 
 ## Animated Demo(s)
 
+### First Video Transmission Test:
+
 <img src="./animations/server-client.gif" alt="Server and Client Video Feed" width="500"/>
+
+### Current Video Feed:
+
+<img src="./animations/server-and-client-ball.gif" alt="Server and Client Ball Screensaver" width="500"/>
 
 ## License
 
